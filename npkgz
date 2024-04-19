@@ -15,12 +15,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # --
-# Copyright 2020-2021 Andi Dittrich <https://andidittrich.com>
+# Copyright 2020-2024 Andi Dittrich <https://andidittrich.com>
 #________________________________________________________________________
 
 _VERSION="1.0.0"
 _LICENSE="MPL-2.0"
-_REPOSITORY="https://github.com/AndiDittrich/npkgz"
+_REPOSITORY="https://github.com/npkgz/npkgz-build"
 
 show_usage(){
     cat << EOF
@@ -30,11 +30,9 @@ Options:
     -h,--help               Displays this help
     -v,--version            Displays version
 
-Commands:
-    build <target> [tag]        Build a docker image within the given directory (cached)
-    rebuild <target> [tag]      Build a docker image within the given directory (uncached)
-    push <target>               Push an existing image to the registry defined by target
-    update <target> [tag]       Rebuild the image and push to registry (uncached)
+Commands:  
+    build <dir>             Pack application
+    update <dir>            Build and trigger deploy hook
 
 EOF
     exit 0
@@ -64,7 +62,7 @@ WORKINGDIR="$(pwd)"
 TARGET_NAME="${2%/}"
 
 # load functions
-source $BASEDIR/lib/functions
+source $BASEDIR/lib/bash-functions
 
 # intro
 # ---------------------------------------
@@ -103,7 +101,7 @@ npkgz_prepare(){
     fi
 
     # dist dir exists ?
-    if [ ! -d "$PKG_PATH/dist" ]; then
+    if [ ! -d "$PKG_PATH/.dist" ]; then
         panic "dist dir doesn't exist"
     fi
 
@@ -141,10 +139,38 @@ npkgz_build(){
     yarn install --production
 
     # create package
-    tar cfz ${PKG_PATH}/dist/${PKG_NAME}.tgz -C ${BUILD_DIR} .
+    tar cfz ${PKG_PATH}/.dist/${PKG_NAME}.tgz -C ${BUILD_DIR} .
 
     # cleanup
     rm -rf ${BUILD_DIR}
+}
+
+# run hook
+# ---------------------------------------
+function npkgz_hook_exec(){
+    log_info "hook [$1] triggered"
+
+    # hook set ?
+    if [ -z "$1" ]; then
+        log_error "invalid hook call"
+        return
+    fi
+
+    # hook file exists ?
+    if [ ! -f $WORKINGDIR/.hooks/$1 ]; then
+        return
+    fi
+
+    # executable ?
+    if [ ! -x $WORKINGDIR/.hooks/$1 ]; then
+        panic "hook [$WORKINGDIR/.hooks/$1] is not executable"
+    fi
+
+    # run hook
+    log_info "running hook [$1].."
+    HOOK_FN="hook_$1"
+    source $WORKINGDIR/.hooks/$1
+    $HOOK_FN
 }
 
 
@@ -167,7 +193,8 @@ case "$1" in
     update)
         npkgz_intro
         npkgz_prepare $2
-        #npkgz_push
+        npkgz_build
+        npkgz_hook_exec "deploy"
         exit 0
     ;;
 
