@@ -15,10 +15,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # --
-# Copyright 2020-2024 Andi Dittrich <https://andidittrich.com>
+# Copyright 2020-2025 Andi Dittrich <https://aenon-dynamics.com>
 #________________________________________________________________________
 
-_VERSION="1.0.0"
+_VERSION="2.0.0"
 _LICENSE="MPL-2.0"
 _REPOSITORY="https://github.com/npkgz/npkgz-build"
 
@@ -33,6 +33,7 @@ Options:
 Commands:  
     build <dir>             Pack application
     update <dir>            Build and trigger deploy hook
+    publish <dir>           Build and trigger publish hook
 
 EOF
     exit 0
@@ -136,7 +137,8 @@ npkgz_build(){
 
     # install dependencies
     cd ${BUILD_DIR}
-    yarn install --production
+    #yarn install --production
+    npm install --omit=dev
 
     # create package
     tar cfz ${PKG_PATH}/.dist/${PKG_NAME}.tgz -C ${BUILD_DIR} .
@@ -195,6 +197,14 @@ case "$1" in
         npkgz_prepare $2
         npkgz_build
         npkgz_hook_exec "deploy"
+        exit 0
+    ;;
+
+    publish)
+        npkgz_intro
+        npkgz_prepare $2
+        npkgz_build
+        npkgz_hook_exec "publish"
         exit 0
     ;;
 
